@@ -1,0 +1,15 @@
+
+.vscode/
+.idea/
+
+
+# 不要jupter
+.ipynb
+
+# 不要缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+
