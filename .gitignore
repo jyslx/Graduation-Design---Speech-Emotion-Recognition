@@ -11,5 +11,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-
+# 不要音频
+*.mp3
+*.wav
 
