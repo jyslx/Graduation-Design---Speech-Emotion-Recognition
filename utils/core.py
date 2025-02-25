@@ -1,4 +1,5 @@
 import os
+import soundfile as sf
 
 def convert_mp3_to_wav(mp3_file: str, optput_wav_file: str) -> None:
     """
@@ -28,3 +29,18 @@ def play_audio(file_path: str) -> None:
     :param file_path: 音频文件路径
     """
     pass
+
+
+def check_wav_channels_sf(file_path: str) -> None:
+    """
+    判断WAV音频的声道
+
+    :param file_path:  音频文件
+    """
+    data, samplerate = sf.read(file_path)
+    num_channels = data.shape[1] if len(data.shape) > 1 else 1  # 判断通道数
+    print(f" 该 WAV 文件是 {num_channels} 声道")
+
+if __name__ == '__main__':
+    # 示例
+    check_wav_channels_sf("your_audio.wav")
