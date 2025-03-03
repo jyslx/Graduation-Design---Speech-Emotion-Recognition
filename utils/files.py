@@ -1,5 +1,6 @@
 import os
 import sys
+import numpy as np
 from random import shuffle
 from typing import Tuple, Union
 
@@ -10,13 +11,11 @@ def remove(file_path: str) -> None:
 
     :param file_path(str): 文件路径
     """
-    for root, dirs, files in os.walk(file_path):
+    for root, dirs, files in os.walk(file_path):  # 用于递归遍历 file_path 目录下的 所有子目录及文件
         for item in files:
             if not item.endswith('.wav'):
-                try:
-                    print("Delete file: ", os.path.join(root, item))
-                except:
-                    continue
+                print("Delete file: ", os.path.join(root, item))
+                os.remove(os.path.join(root, item))
 
 
 def rename(file_path: str) -> None:

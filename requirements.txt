@@ -1,1 +1,7 @@
+numpy
+pydub
+librosa
+PyAudio
+soundfile
 opensmile
+matplotlib
