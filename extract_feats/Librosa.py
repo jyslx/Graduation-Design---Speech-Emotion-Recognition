@@ -1,12 +1,15 @@
 import os
 import re
 import sys
+from utils.files import *
+import csv
 import numpy as np
 import librosa
 from typing import Tuple, Union
 import matplotlib.pyplot as plt
 import librosa.display
 from librosa.core import pitch
+import ast
 
 
 def features(X, sample_rate: float) -> np.ndarray:
@@ -21,7 +24,7 @@ def features(X, sample_rate: float) -> np.ndarray:
 
     pitches, magnitudes = librosa.piptrack(y=X, sr=sample_rate, S=stft, fmin=70, fmax=400)
     pitch = []  # 音频
-    print(magnitudes[:, 1])
+    # print(magnitudes[:, 1])
     for i in range(magnitudes.shape[1]):
         index = magnitudes[:, i].argmax()  # 找到当前帧中能量最大的音高
         pitch.append(pitches[index, i])  # 将这一个帧中能量最大的音高作为这一帧的基频
@@ -61,7 +64,7 @@ def features(X, sample_rate: float) -> np.ndarray:
     zerocr = np.mean(librosa.feature.zero_crossing_rate(X))
 
     S, phase = librosa.magphase(stft)
-    meanMagnitude = np.meas(S)
+    meanMagnitude = np.mean(S)
     stdMagnitude = np.std(S)
     maxMagnitude = np.max(S)
 
@@ -77,6 +80,13 @@ def features(X, sample_rate: float) -> np.ndarray:
     ])
 
     ext_features = np.concatenate((ext_features, mfccs, mfccsstd, mfccmax, chroma, mel, contrast))
+    print(ext_features.shape)
+
+    # 验证特征维度是否与表头一致
+    expected_length = 16 + 50 * 3 + 12 + 128 + 7
+    if len(ext_features) != expected_length:
+        raise ValueError(f"特征维度错误: 应为 {expected_length}, 实际为 {len(ext_features)}")
+
     return ext_features
 
 
@@ -96,17 +106,96 @@ def extract_features(audio_path: str, pad: bool = False) -> np.ndarray:
     return features(X, sample_rate)
 
 
+def generate_csv_header() -> list:
+    """
+    设计特征数据信息
+
+    :return: csv列名
+    """
+    header = ["label"]
+
+    # 基础统计特征（16列）
+    base_features = [
+        "flatness",
+        "zerocr",
+        "meanMagnitude",
+        "maxMagnitude",
+        "mean_cent",
+        "std_cent",
+        "max_cent",
+        "stdMagnitude",
+        "pitch_tuning_offset",
+        "pitch_mean",
+        "pit_max",
+        "pitch_std",
+        "pitch_tuning_offset",  # 重复列，可能需要删除
+        "meanrms",
+        "maxrms",
+        "stdrms",
+    ]
+    header.extend(base_features)
+
+    # MFCC 特征（50×3=150列）
+    mfcc_labels = ["mfcc_{}_{}".format(i, stat) for stat in ["mean", "std", "max"] for i in range(50)]
+    header.extend(mfcc_labels)
+
+    # 色谱图（12列）
+    chroma_labels = ["chroma_{}".format(i) for i in range(12)]
+    header.extend(chroma_labels)
+
+    # 梅尔频谱（128列）
+    mel_labels = ["mel_{}".format(i) for i in range(128)]
+    header.extend(mel_labels)
+
+    # 频谱对比度（7列）
+    contrast_labels = ["contrast_{}".format(i) for i in range(7)]
+    header.extend(contrast_labels)
+
+    return header
 
 
-def get_data(config, data_path: str):
+def get_data(config) -> None:
     """
     提取说有音频的特征：遍历音频文件夹，提取每一个音频的特征，把所有的特征都存放在feature文件夹中
 
-    :param config: 配置文件
-    :param data_path: 数据集文件夹
+    :param config: 配置参数对象
     """
+    mkdirs(config.feature_folder)
+    csv_path = os.path.join(config.feature_folder, config.feature_name)
+
+    # 1. 获取所有音频文件路径（需要明确 get_data_path 返回的是文件列表还是目录）
+    # 假设 get_data_path 返回的是文件路径列表
+    audio_files = get_data_path(config.data_path, ast.literal_eval(config.class_labels))
+
+    # 2. 生成表头
+    header = generate_csv_header()
+
+    # 3. 一次性打开文件，持续写入
+    with open(csv_path, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(header)  # 写入表头
+
+        for audio_path in audio_files:
+            # 4. 提取标签（使用 os.path 确保跨平台兼容性）
+            label = os.path.basename(os.path.dirname(audio_path))  # 假设标签是父目录名
+
+            # 5. 提取特征
+            try:
+                feature = extract_features(audio_path, pad=True)
+                feature_list = feature.tolist()
+            except Exception as e:
+                print(f"处理文件 {audio_path} 失败: {str(e)}")
+                continue
+
+            # 6. 写入数据行
+            writer.writerow([label] + feature_list)
 
 
 if __name__ == '__main__':
-    audio_path = r"C:\Users\35055\Desktop\example.wav"
-    signal = extract_features(audio_path, True)
+    # audio_path = r"C:\Users\35055\Desktop\example.wav"
+    # signal = extract_features(audio_path, True)
+    # print(signal)
+    # print(signal.shape)
+    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
+    config = config.get_config(ini_path)
+    get_data(config)

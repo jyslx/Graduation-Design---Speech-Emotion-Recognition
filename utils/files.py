@@ -3,7 +3,8 @@ import sys
 import numpy as np
 from random import shuffle
 from typing import Tuple, Union
-
+from utils import config
+import ast
 
 def remove(file_path: str) -> None:
     """
@@ -95,6 +96,7 @@ def get_data_path(data_path: str, class_labels: list) -> list:
     os.chdir(cur_dir)
 
     shuffle(wav_file_path)
+    print(wav_file_path)
     return wav_file_path
 
 
@@ -109,4 +111,6 @@ def load_feature(config, train: bool) -> Union[Tuple[np.ndarray], np.ndarray]:
 
 
 if __name__ == '__main__':
-    pass
+    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
+    config = config.get_config(ini_path)
+    get_data_path(config.data_path, ast.literal_eval(config.class_labels))
