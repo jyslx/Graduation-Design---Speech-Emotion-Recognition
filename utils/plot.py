@@ -1,18 +1,29 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import librosa
-
+matplotlib.use('TkAgg')  # 使用 Tk 窗口显示
 
 def curve(train: list, val: list, title: str, y_label: str) -> None:
     """
     绘制损失值和准确率曲线
 
     :param train: 训练集损失值或准确率数组
-    :param val: 测试机损失值或准确率数组
+    :param val: 测试集损失值或准确率数组
     :param title: 图像标题
     :param y_label:  y轴标题
     """
-    pass
+
+    epochs = range(1, len(train) + 1)
+    plt.figure(figsize=(8, 5))
+    plt.plot(epochs, train, 'bo-', label="Train")  # 训练数据蓝色
+    plt.plot(epochs, val, 'ro-', label="Validation")  # 验证数据红色
+    plt.xlabel("Epochs")
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.legend()
+    plt.grid()
+    plt.show()
 
 
 def radar(data_prob: np.ndarray, class_labels: list) -> None:

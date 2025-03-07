@@ -1,7 +1,7 @@
 # 主要是读取ini文件
 
 import configparser
-
+import ast
 
 class Config:
     """
@@ -19,6 +19,24 @@ class Config:
                 self.__dict__[k] = v
 
 
+def parse_value(value: str):
+    """
+    根据前缀解析数据类型
+
+    :value: 配置参数
+    """
+    if value.startswith("int:"):
+        return int(value[4:])
+    elif value.startswith("float:"):
+        return float(value[6:])
+    elif value.startswith("bool:"):
+        return value[5:].lower() == "true"
+    elif value.startswith("list:"):
+        return ast.literal_eval(value[5:])
+    else:
+        return value  # 默认是字符串
+
+
 def load_parse(config: configparser) -> dict:
     """
     从ConfigParser对象中加载配置参数全部转换为字典
@@ -30,7 +48,7 @@ def load_parse(config: configparser) -> dict:
     for section in config.sections():
         config_dict[section] = {}
         for key, value in config.items(section):
-            config_dict[section][key] = value
+            config_dict[section][key] = parse_value(value)
     return config_dict
 
 
@@ -52,4 +70,7 @@ def get_config(file_path: str) -> Config:
 if __name__ == '__main__':
     ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
     config = get_config(ini_path)
-    print(config.feature_name)
+    print(config.hidden_size)
+    print(type(config.hidden_size))
+    print(config.class_labels)
+    print(type(config.class_labels))

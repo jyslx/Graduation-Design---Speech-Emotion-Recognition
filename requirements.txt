@@ -1,7 +1,11 @@
 numpy
+pandas
 pydub
 librosa
 PyAudio
 soundfile
 opensmile
 matplotlib
+torch
+torchvision
+torchaudio
