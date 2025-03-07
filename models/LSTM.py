@@ -10,7 +10,8 @@ from base import BaseModel
 from abc import ABC, abstractmethod
 from models import SERDataset, DataProcessor
 from tqdm import tqdm
-
+from extract_feats import Librosa
+from extract_feats.Librosa import *
 from utils import config, files, plot
 
 feature = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\features\librosa\feature.csv"
@@ -33,6 +34,8 @@ class SERLSTM(BaseModel, nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.dropout = nn.Dropout(0.3)  # 随机丢弃30%神经元防止过拟合
         self.fc = nn.Linear(self.config.hidden_size * 2, self.config.num_classes)  # 双向需将隐藏层维度乘2
+        self.label_encoder = None
+        self.scaler = None
 
     def forward(self, x):
         # 输入x形状: (batch_size, seq_len=1, input_size)
@@ -46,6 +49,10 @@ class SERLSTM(BaseModel, nn.Module):
         if self.trained:
             processor = DataProcessor(self.config)  # 数据预处理管道
             (X_train, y_train), (X_val, y_val), (X_test, y_test) = processor.load_and_preprocess()
+
+            # 保存标签编码器和标准化器
+            self.label_encoder = processor.label_encoder
+            self.scaler = processor.scaler  # 关键：存储scaler
 
             train_dataset = SERDataset(X_train, y_train)
             val_dataset = SERDataset(X_val, y_val)
@@ -108,60 +115,50 @@ class SERLSTM(BaseModel, nn.Module):
         files.mkdirs(self.config.checkpoint_path)
         torch.save(self.state_dict(), self.config.checkpoint_path + self.config.checkpoint_name)
 
-    # ----------------------
-    # 预测功能
-    # ----------------------
-    def predict(self, input_data, return_proba=False):
+    def predict(self, input_data: str):
         """
-        预测输入数据的类别
-        :param input_data: 支持多种输入格式：
-            - numpy数组 (已标准化)
-            - pandas DataFrame (需包含特征列)
-            - 文件路径 (直接读取CSV)
-        :param return_proba: 是否返回概率分布
+        预测音频情感类别，并返回置信度分布
+
+        :param input_data: 音频文件路径
+        :return: (预测类别, 置信度字典)
         """
+        # 1. 特征提取
+        features = eval(self.config.feature_method).extract_features(input_data)
+
+        # 2. 特征标准化（使用训练时的scaler）
+        if not hasattr(self, 'scaler'):
+            raise ValueError("Scaler not found! Model must be trained first.")
+        scaled_features = self.scaler.transform(features.reshape(1, -1))  # 注意保持二维形状
+
+        # 3. 转换为Tensor并匹配输入维度
+        input_tensor = torch.FloatTensor(scaled_features) \
+            .unsqueeze(1) \
+            .to(self.device)  # 形状: (1, 1, 313)
+
+        # 4. 模型推理
         self.eval()
-
-        # 数据预处理
-        if isinstance(input_data, str):  # 文件路径
-            df = pd.read_csv(input_data)
-            if "label" in df.columns:
-                df = df.drop("label", axis=1)
-            raw_features = df.values
-        elif isinstance(input_data, pd.DataFrame):  # DataFrame
-            raw_features = input_data.values
-        else:  # numpy数组
-            raw_features = input_data
-
-        # 标准化特征
-        if self.processor is not None:
-            features = self.processor.scaler.transform(raw_features)
-        else:
-            features = raw_features
-
-        # 转换为Tensor
-        features_tensor = torch.FloatTensor(features).unsqueeze(1).to(self.device)
-
-        # 执行预测
         with torch.no_grad():
-            outputs = self(features_tensor)
+            outputs = self(input_tensor)
             probabilities = torch.softmax(outputs, dim=1)
 
-        # 结果解码
-        if return_proba:
-            return probabilities.cpu().numpy()
-        else:
-            predicted_indices = outputs.argmax(1).cpu().numpy()
-            return self.processor.label_encoder.inverse_transform(predicted_indices)
+        # 5. 转换为字典形式的置信度
+        confidence = {
+            self.label_encoder.classes_[i]: float(prob)
+            for i, prob in enumerate(probabilities.squeeze().cpu().numpy())
+        }
+        print(confidence)
 
+        predicted_class = max(confidence, key=confidence.get)  # 最大概率情绪
 
-# # 示例用法
-# sample_feature = X_test[0]  # 假设这是标准化后的特征
-# emotion = predict_emotion(sample_feature)
-# print("Predicted Emotion:", emotion)
+        data_prob = np.array(list(confidence.values()))  # 转换为 NumPy 数组
+        class_labels = list(confidence.keys())  # 获取类别标签
+        plot.radar(data_prob, class_labels)  # 绘制雷达图
+
 
 if __name__ == '__main__':
+    testwav = r"C:\Users\35055\Desktop\example.wav"
     ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
     config = config.get_config(ini_path)
     lstm = SERLSTM(config)
     lstm.train_model()
+    lstm.predict(testwav)

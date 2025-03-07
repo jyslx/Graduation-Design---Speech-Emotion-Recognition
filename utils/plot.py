@@ -30,10 +30,30 @@ def radar(data_prob: np.ndarray, class_labels: list) -> None:
     """
     绘制置信概率雷达图
 
-    :param data_prob: 概率数组
-    :param class_labels: 感情标签
+    :param data_prob: 概率数组 (形状: (num_classes,))
+    :param class_labels: 感情标签 (长度应与 num_classes 一致)
     """
-    pass
+    num_classes = len(class_labels)
+
+    # 角度计算
+    angles = np.linspace(0, 2 * np.pi, num_classes, endpoint=False).tolist()
+    data_prob = np.concatenate((data_prob, [data_prob[0]]))  # 闭合雷达图
+    angles.append(angles[0])  # 闭合雷达图
+
+    # 创建图形
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={'projection': 'polar'})
+    ax.fill(angles, data_prob, color='b', alpha=0.25)
+    ax.plot(angles, data_prob, color='b', linewidth=2)
+
+    # 设置标签
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(class_labels)
+    ax.set_yticklabels([])  # 不显示径向刻度
+    ax.set_ylim(0, 1)
+
+    # 显示图形
+    plt.title("Emotion Probability Radar Chart")
+    plt.show()
 
 
 def waveform(file_path: str) -> None:
