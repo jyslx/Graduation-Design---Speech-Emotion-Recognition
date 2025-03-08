@@ -6,14 +6,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
-from base import BaseModel
+from models.base import BaseModel
 from abc import ABC, abstractmethod
 from models import SERDataset, DataProcessor
 from tqdm import tqdm
 from extract_feats import Librosa
 from extract_feats.Librosa import *
 from utils import config, files, plot
-
+import joblib
 feature = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\features\librosa\feature.csv"
 
 
@@ -115,7 +115,51 @@ class SERLSTM(BaseModel, nn.Module):
         files.mkdirs(self.config.checkpoint_path)
         torch.save(self.state_dict(), self.config.checkpoint_path + self.config.checkpoint_name)
 
-    def predict(self, input_data: str):
+    def predict(self, data_path: str) -> str:
+        """
+        预测音频情感
+
+        :param data_path: 音频文件路径
+        :return: 返回情感类别
+        """
+        self.to(self.device)
+        self.eval()  # 设置为评估模式
+
+        # 1. 加载训练好的权重
+        checkpoint_path = self.config.checkpoint_path + self.config.checkpoint_name
+        self.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
+
+        # 2. 还原 LabelEncoder 和 Scaler
+        self.label_encoder = LabelEncoder()
+        self.label_encoder.classes_ = np.array(self.config.class_labels)
+        self.scaler = joblib.load(self.config.feature_folder + "scaler.pkl")  # 加载标准化模型
+
+        # 3. 特征提取
+        features = eval(self.config.feature_method).extract_features(data_path)
+
+        # 4. 特征标准化（使用训练时的scaler）
+        if not hasattr(self, 'scaler'):
+            raise ValueError("Scaler not found! Model must be trained first.")
+        scaled_features = self.scaler.transform(features.reshape(1, -1))  # 保持二维形状
+
+        # 5. 转换为 Tensor 并匹配模型输入维度
+        input_tensor = torch.FloatTensor(scaled_features).unsqueeze(1).to(self.device)  # 形状: (1, 1, 313)
+
+        # **不手动调用 forward，直接调用模型**
+        with torch.no_grad():
+            outputs = self(input_tensor)  # **这里自动调用 forward()**
+            probabilities = torch.softmax(outputs, dim=1)  # 计算类别概率
+
+        # 7. 解析预测结果
+        confidence = {
+            self.label_encoder.classes_[i]: float(prob)
+            for i, prob in enumerate(probabilities.squeeze().cpu().numpy())
+        }
+        predicted_class = max(confidence, key=confidence.get)  # 获取最高置信度的类别
+
+        return predicted_class
+
+    def predict_proba(self, input_data: str):
         """
         预测音频情感类别，并返回置信度分布
 
@@ -154,6 +198,11 @@ class SERLSTM(BaseModel, nn.Module):
         class_labels = list(confidence.keys())  # 获取类别标签
         plot.radar(data_prob, class_labels)  # 绘制雷达图
 
+    @classmethod
+    def load(cls, config):
+        model = SERLSTM(config)
+        return model
+
 
 if __name__ == '__main__':
     testwav = r"C:\Users\35055\Desktop\example.wav"
@@ -161,4 +210,4 @@ if __name__ == '__main__':
     config = config.get_config(ini_path)
     lstm = SERLSTM(config)
     lstm.train_model()
-    lstm.predict(testwav)
+    lstm.predict_proba(testwav)

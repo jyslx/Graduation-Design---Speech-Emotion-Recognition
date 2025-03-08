@@ -7,7 +7,7 @@ import pandas as pd
 from tqdm import tqdm
 import torch.nn as nn
 import torch.optim as optim
-
+import joblib
 
 class DataProcessor:
     """数据预处理管道"""
@@ -30,6 +30,7 @@ class DataProcessor:
 
         # 特征标准化
         scaled_features = self.scaler.fit_transform(features)
+        joblib.dump(self.scaler, self.config.feature_folder + "scaler.pkl")  # 保存 scaler
 
         # 数据集划分
         X_train, X_temp, y_train, y_temp = train_test_split(

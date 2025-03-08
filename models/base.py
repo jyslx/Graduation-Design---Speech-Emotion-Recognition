@@ -16,8 +16,12 @@ class BaseModel(ABC):  # ABC（Abstract Base Class）是 Python 提供的抽象�
         pass
 
     @abstractmethod
-    def predict(self, data_path: str) -> None:
-        """预测音频的情感"""
+    def predict_proba(self, data_path: str) -> None:
+        """预测音频的情感的置信图"""
+        pass
+    @abstractmethod
+    def predict(self, data_path: str) -> str:
+        """预测音频感情"""
         pass
 
     @abstractmethod
@@ -25,11 +29,11 @@ class BaseModel(ABC):  # ABC（Abstract Base Class）是 Python 提供的抽象�
         """保存模型"""
         pass
 
-    # @classmethod  # 类方法，直接作用于类，而不是实例
-    # @abstractmethod
-    # def load(cls, path: str, name: str) -> None:
-    #     """加载模型"""
-    #     pass
+    @classmethod  # 类方法，直接作用于类，而不是实例
+    @abstractmethod
+    def load(cls, config):
+        """加载模型"""
+        pass
     #
     # @classmethod
     # @abstractmethod
