@@ -169,7 +169,7 @@ class librosaExtractor:
 
         # 1. 获取所有音频文件路径（需要明确 get_data_path 返回的是文件列表还是目录）
         # 假设 get_data_path 返回的是文件路径列表
-        audio_files = get_data_path(self.config.data_path, ast.literal_eval(self.config.class_labels))
+        audio_files = get_data_path(self.config.data_path, self.config.class_labels)
 
         # 2. 生成表头
         header = self.generate_csv_header()

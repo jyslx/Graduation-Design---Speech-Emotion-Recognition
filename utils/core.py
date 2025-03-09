@@ -1,8 +1,10 @@
 import os
+import time
 import wave
 import numpy
 import pyaudio
 import soundfile as sf
+from functools import wraps
 from pydub import AudioSegment
 
 def convert_mp3_to_wav(mp3_file: str, output_wav_file: str) -> None:
@@ -70,6 +72,23 @@ def check_wav_channels_sf(file_path: str) -> None:
     num_channels = data.shape[1] if len(data.shape) > 1 else 1  # 判断通道数
     print(f" 该 WAV 文件是 {num_channels} 声道")
 
+
+
+def timing_decorator(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        print(f"开始执行: {func.__name__}")
+
+        result = func(*args, **kwargs)  # 调用原始函数
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"{func.__name__} 执行完成，耗时: {elapsed_time:.2f} 秒")
+
+        return result  # 返回原始函数的返回值（如果有）
+
+    return wrapper
 if __name__ == '__main__':
     # 示例
     check_wav_channels_sf("your_audio.wav")
