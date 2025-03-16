@@ -15,3 +15,6 @@ __pycache__/
 *.mp3
 *.wav
 
+# 不要wandb
+wandb
+

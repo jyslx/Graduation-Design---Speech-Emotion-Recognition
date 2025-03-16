@@ -10,13 +10,16 @@ import matplotlib.pyplot as plt
 import librosa.display
 from librosa.core import pitch
 import ast
+from extract_feats.base import BaseExtractor
 
-class librosaExtractor:
+
+class librosaExtractor(BaseExtractor):
 
     def __init__(self, config):
+        BaseExtractor.__init__(self, config=config)
         self.config = config
 
-    @classmethod
+
     def features(self, X, sample_rate: float) -> np.ndarray:
         """
         提取音频数据特征
@@ -53,9 +56,8 @@ class librosaExtractor:
 
         # 使用系数为50的MFCC特征
         mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=50).T, axis=0)
-        mfccsstd = np.std(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=50).T, axis=0)
-        mfccmax = np.max(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=50).T, axis=0)
-
+        # mfccsstd = np.std(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=50).T, axis=0)
+        # mfccmax = np.max(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=50).T, axis=0)
         # 色谱图
         chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T, axis=0)
 
@@ -80,38 +82,23 @@ class librosaExtractor:
         maxrms = np.max(rmse)
 
         ext_features = np.array([
-            flatness, zerocr, meanMagnitude, maxMagnitude, mean_cent, std_cent, max_cent, stdMagnitude, pitch_tuning_offset,
-            pitch_mean, pit_max, pitch_std, pitch_tuning_offset, meanrms, maxrms, stdrms
+            flatness, zerocr, meanMagnitude, maxMagnitude, mean_cent, std_cent, max_cent, stdMagnitude,
+            pitch_tuning_offset,
+            pitch_mean, pit_max, pitch_std, meanrms, maxrms, stdrms
         ])
-
-        ext_features = np.concatenate((ext_features, mfccs, mfccsstd, mfccmax, chroma, mel, contrast))
+        # mfccsstd, mfccmax,
+        ext_features = np.concatenate((ext_features, mfccs, chroma, mel, contrast))
         print(ext_features.shape)
 
         # 验证特征维度是否与表头一致
-        expected_length = 16 + 50 * 3 + 12 + 128 + 7
+        expected_length = 212
         if len(ext_features) != expected_length:
             raise ValueError(f"特征维度错误: 应为 {expected_length}, 实际为 {len(ext_features)}")
 
         return ext_features
 
-    @classmethod
-    def extract_features(cls, audio_path: str, pad: bool = False) -> np.ndarray:
-        """
-        对单个音频文件进行特征的提取
 
-        :param audio_path: 音频文件
-        :param pad: 是否需要对音频进行填充
-        """
-        X, sample_rate = librosa.load(audio_path, sr=None)  # 读取音频文件
-        max_ = X.shape[0] / sample_rate  # 计算音频时长
-
-        if pad:
-            length = (int(np.ceil(max_) * sample_rate)) - X.shape[0]  # 计算需要填充的时长,向上取整
-            X = np.pad(X, (0, int(length)), 'constant')  # 用0进行填充
-        return cls.features(X, sample_rate)
-
-    @staticmethod
-    def generate_csv_header() -> list:
+    def generate_csv_header(self) -> list:
         """
         设计特征数据信息
 
@@ -133,15 +120,14 @@ class librosaExtractor:
             "pitch_mean",
             "pit_max",
             "pitch_std",
-            "pitch_tuning_offset",  # 重复列，可能需要删除
             "meanrms",
             "maxrms",
             "stdrms",
         ]
         header.extend(base_features)
 
-        # MFCC 特征（50×3=150列）
-        mfcc_labels = ["mfcc_{}_{}".format(i, stat) for stat in ["mean", "std", "max"] for i in range(50)]
+        # MFCC 特征（50×3=150列）, "std", "max"
+        mfcc_labels = ["mfcc_{}_{}".format(i, stat) for stat in ["mean"] for i in range(50)]
         header.extend(mfcc_labels)
 
         # 色谱图（12列）
@@ -157,42 +143,6 @@ class librosaExtractor:
         header.extend(contrast_labels)
 
         return header
-
-
-    def get_data(self) -> None:
-        """
-        提取说有音频的特征：遍历音频文件夹，提取每一个音频的特征，把所有的特征都存放在feature文件夹中
-
-        """
-        mkdirs(self.config.feature_folder)
-        csv_path = os.path.join(self.config.feature_folder, self.config.feature_name)
-
-        # 1. 获取所有音频文件路径（需要明确 get_data_path 返回的是文件列表还是目录）
-        # 假设 get_data_path 返回的是文件路径列表
-        audio_files = get_data_path(self.config.data_path, self.config.class_labels)
-
-        # 2. 生成表头
-        header = self.generate_csv_header()
-
-        # 3. 一次性打开文件，持续写入
-        with open(csv_path, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(header)  # 写入表头
-
-            for audio_path in audio_files:
-                # 4. 提取标签（使用 os.path 确保跨平台兼容性）
-                label = os.path.basename(os.path.dirname(audio_path))  # 假设标签是父目录名
-
-                # 5. 提取特征
-                try:
-                    feature = self.extract_features(audio_path, pad=True)
-                    feature_list = feature.tolist()
-                except Exception as e:
-                    print(f"处理文件 {audio_path} 失败: {str(e)}")
-                    continue
-
-                # 6. 写入数据行
-                writer.writerow([label] + feature_list)
 
 
 if __name__ == '__main__':

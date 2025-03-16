@@ -11,3 +11,4 @@ torchvision
 torchaudio
 fastapi
 uvicorn
+transformers

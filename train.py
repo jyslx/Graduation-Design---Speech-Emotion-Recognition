@@ -1,15 +1,17 @@
 from utils import config
 from utils.core import timing_decorator
-from extract_feats import Librosa
-from models import LSTM
+from extract_feats import Librosa, Torchaudio
+from models import LSTM, RNN
 
 Extractor = {
     'librosaExtractor': Librosa.librosaExtractor,
+    'TorchaudioExtractor': Torchaudio.TorchaudioExtractor,
     # 扩展其他特征提取方式
 }
 
 _MODELS = {
     'lstm': LSTM.SERLSTM,
+    'RNN': RNN.SERRNN,
     # 扩展其他模型，如 CNN, MLP, SVM
 }
 
@@ -39,6 +41,7 @@ def train(config) -> None:
 
 
 if __name__ == '__main__':
-    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
+    # ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
+    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\RNN.ini"
     config = config.get_config(ini_path)
     train(config)
