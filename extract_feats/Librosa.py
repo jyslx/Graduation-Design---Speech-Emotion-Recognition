@@ -150,7 +150,7 @@ if __name__ == '__main__':
     # signal = extract_features(audio_path, True)
     # print(signal)
     # print(signal.shape)
-    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
+    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\configuration\demo.ini"
     config = config.get_config(ini_path)
     extractor = librosaExtractor(config)
     extractor.get_data()

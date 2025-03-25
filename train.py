@@ -1,11 +1,12 @@
 from utils import config
 from utils.core import timing_decorator
-from extract_feats import Librosa, Torchaudio
+from extract_feats import Librosa, Torchaudio, Wav2Vec2
 from models import LSTM, RNN
 
 Extractor = {
     'librosaExtractor': Librosa.librosaExtractor,
     'TorchaudioExtractor': Torchaudio.TorchaudioExtractor,
+    'Wav2Vec2Extractor': Wav2Vec2.Wav2Vec2Extractor,
     # 扩展其他特征提取方式
 }
 
@@ -42,6 +43,6 @@ def train(config) -> None:
 
 if __name__ == '__main__':
     # ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
-    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\RNN.ini"
+    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\configuration\new.ini"
     config = config.get_config(ini_path)
     train(config)

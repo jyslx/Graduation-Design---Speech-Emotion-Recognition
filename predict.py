@@ -1,18 +1,19 @@
 from fastapi import FastAPI, UploadFile, File
 import shutil
 from utils import config
-from models import LSTM
+from models import LSTM, RNN
 import os
-
+import uvicorn
 app = FastAPI()
 
 _MODELS = {
     'lstm': LSTM.SERLSTM,
+    'RNN': RNN.SERRNN,
     # 扩展其他模型，如 CNN, MLP, SVM
 }
 
 # 读取配置
-ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
+ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\configuration\demo.ini"
 config = config.get_config(ini_path)
 
 # 加载模型（避免每次请求都重新加载）

@@ -63,7 +63,7 @@ class BaseExtractor(ABC):
                 # 5. 提取特征
                 try:
                     feature = self.extract_features(audio_path, pad=True)
-                    feature_list = feature.tolist()
+                    feature_list = feature.flatten().tolist()
                 except Exception as e:
                     print(f"处理文件 {audio_path} 失败: {str(e)}")
                     continue
