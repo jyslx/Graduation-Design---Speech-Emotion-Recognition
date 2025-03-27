@@ -66,20 +66,6 @@ class SERCNN(BaseModel, nn.Module):
         self.label_encoder = None
         self.scaler = None
 
-        wandb.init(
-            project="SER",
-            name="CNN",
-            config={
-                "hidden_size": self.config.hidden_size,
-                "num_layers": self.config.num_layers,
-                "lr": self.config.lr,
-                "batch_size": self.config.batch_size,
-                "epochs": self.config.epochs,
-                # "device": self.device,
-                "dropout": self.config.dropout,
-                "model": "CNN"
-            }
-        )
 
     def forward(self, x):
         # print(f"Input shape: {x.shape}")
@@ -114,7 +100,7 @@ class SERCNN(BaseModel, nn.Module):
             train_loss, train_correct = 0.0, 0
             for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch + 1}"):
                 self.optimizer.zero_grad()
-                print("输入input的形状 ", inputs.shape) # 输入input的形状  torch.Size([10, 1, 1, 19])
+                print("输入input的形状 ", inputs.shape)  # 输入input的形状  torch.Size([10, 1, 1, 19])
                 outputs = self(inputs)
                 print("debug1")
                 loss = self.criterion(outputs, labels)

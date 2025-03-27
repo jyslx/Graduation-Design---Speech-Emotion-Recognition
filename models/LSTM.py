@@ -54,20 +54,6 @@ class SERLSTM(BaseModel, nn.Module):
         self.label_encoder = None
         self.scaler = None
 
-        wandb.init(
-            project="SER",
-            name="LSTM",
-            config={
-                "hidden_size": self.config.hidden_size,
-                "num_layers": self.config.num_layers,
-                "lr": self.config.lr,
-                "batch_size": self.config.batch_size,
-                "epochs": self.config.epochs,
-                # "device": self.device,
-                "dropout": self.config.dropout,
-                "model": "CNN"
-            }
-        )
 
     def forward(self, x):
         # 输入x形状: (batch_size, seq_len=1, input_size)

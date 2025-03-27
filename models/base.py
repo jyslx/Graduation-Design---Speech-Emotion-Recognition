@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-
+import wandb
 
 class BaseModel(ABC):  # ABC（Abstract Base Class）是 Python 提供的抽象类基类，允许创建抽象类。
     """所有模型的基类"""
@@ -9,6 +9,20 @@ class BaseModel(ABC):  # ABC（Abstract Base Class）是 Python 提供的抽象�
         self.model = model
         self.config = config
         self.trained = self.config.trained
+
+        wandb.init(
+            project="SER",
+            name=self.config.wandb_name,
+            config={
+                "hidden_size": self.config.hidden_size,
+                "num_layers": self.config.num_layers,
+                "lr": self.config.lr,
+                "batch_size": self.config.batch_size,
+                "epochs": self.config.epochs,
+                "dropout": self.config.dropout,
+                "model": self.config.model,
+            }
+        )
 
     @abstractmethod  # 抽象方法，子类必须实现。
     def train_model(self) -> None:
