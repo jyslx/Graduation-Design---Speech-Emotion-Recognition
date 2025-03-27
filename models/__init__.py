@@ -49,9 +49,9 @@ class DataProcessor:
 class SERDataset(Dataset):
     """语音情感识别数据集"""
 
-    def __init__(self, features, labels):
-        self.features = torch.FloatTensor(features)
-        self.labels = torch.LongTensor(labels)
+    def __init__(self, features, labels, device="cpu"):
+        self.features = torch.FloatTensor(features).to(device)
+        self.labels = torch.LongTensor(labels).to(device)
 
     def __len__(self):
         return len(self.labels)
@@ -84,4 +84,3 @@ class Validator:
             'loss': total_loss / len(self.val_loader.dataset),
             'accuracy': correct / len(self.val_loader.dataset)
         }
-

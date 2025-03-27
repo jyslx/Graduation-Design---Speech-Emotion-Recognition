@@ -12,11 +12,13 @@ from models import SERDataset, DataProcessor
 from tqdm import tqdm
 from extract_feats import Librosa
 from extract_feats.Librosa import *
+from extract_feats.Wav2Vec2 import *
+from extract_feats.Torchaudio import *
 from utils import config, files, plot
 import joblib
 import wandb
-feature = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\features\librosa\feature.csv"
 
+feature = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\features\librosa\feature.csv"
 
 
 class SERLSTM(BaseModel, nn.Module):
@@ -24,6 +26,8 @@ class SERLSTM(BaseModel, nn.Module):
         # 先初始化 BaseModel 和 nn.Module
         BaseModel.__init__(self, model=None, config=config)  # 需要初始化Base类的构造参数
         nn.Module.__init__(self)
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.lstm = nn.LSTM(
             input_size=self.config.input_size,  # 输入特征的维度（如MFCC特征数）
             hidden_size=self.config.hidden_size,  # 隐藏层神经元数量（如128）
@@ -31,11 +35,22 @@ class SERLSTM(BaseModel, nn.Module):
             bidirectional=True,  # 启用双向LSTM
             batch_first=True  # 输入格式为(batch, seq, feature)
         )
-        self.optimizer = optim.Adam(self.parameters(), lr=config.lr)
-        self.criterion = nn.CrossEntropyLoss()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.dropout = nn.Dropout(0.3)  # 随机丢弃30%神经元防止过拟合
         self.fc = nn.Linear(self.config.hidden_size * 2, self.config.num_classes)  # 双向需将隐藏层维度乘2
+
+        self.criterion = nn.CrossEntropyLoss().to(self.device)
+
+        self.to(self.device)
+
+        self.optimizer = optim.Adam(self.parameters(), lr=self.config.lr)
+        # 确保 optimizer 也在 GPU
+        for param in self.optimizer.state.values():
+            if isinstance(param, torch.Tensor):
+                param.data = param.data.to(self.device)
+                if param.grad is not None:
+                    param.grad.data = param.grad.data.to(self.device)
+
         self.label_encoder = None
         self.scaler = None
 
@@ -48,7 +63,7 @@ class SERLSTM(BaseModel, nn.Module):
                 "lr": self.config.lr,
                 "batch_size": self.config.batch_size,
                 "epochs": self.config.epochs,
-                "device": self.device,
+                # "device": self.device,
                 "dropout": self.config.dropout,
                 "model": "CNN"
             }
@@ -56,7 +71,11 @@ class SERLSTM(BaseModel, nn.Module):
 
     def forward(self, x):
         # 输入x形状: (batch_size, seq_len=1, input_size)
-        out, _ = self.lstm(x)  # 输出形状: (batch_size, seq_len, hidden_size*2)
+        x = x.to(self.device)  # 确保输入数据在 GPU
+        h0 = torch.zeros(self.config.num_layers * 2, x.size(0), self.config.hidden_size).to(self.device)
+        c0 = torch.zeros(self.config.num_layers * 2, x.size(0), self.config.hidden_size).to(self.device)
+
+        out, _ = self.lstm(x, (h0, c0))  # 传递 hidden state
         out = self.dropout(out[:, -1, :])  # 取最后一个时间步的输出
         out = self.fc(out)  # 全连接层分类
         return out
@@ -66,14 +85,12 @@ class SERLSTM(BaseModel, nn.Module):
         if self.trained:
             processor = DataProcessor(self.config)  # 数据预处理管道
             (X_train, y_train), (X_val, y_val), (X_test, y_test) = processor.load_and_preprocess()
-
-            # 保存标签编码器和标准化器
             self.label_encoder = processor.label_encoder
             self.scaler = processor.scaler  # 关键：存储scaler
 
-            train_dataset = SERDataset(X_train, y_train)
-            val_dataset = SERDataset(X_val, y_val)
-            test_dataset = SERDataset(X_test, y_test)
+            train_dataset = SERDataset(X_train, y_train, device=self.device)
+            val_dataset = SERDataset(X_val, y_val, device=self.device)
+            test_dataset = SERDataset(X_test, y_test, device=self.device)
 
             train_loader = DataLoader(train_dataset, batch_size=self.config.batch_size, shuffle=True)
             val_loader = DataLoader(val_dataset, batch_size=self.config.batch_size)
@@ -84,37 +101,33 @@ class SERLSTM(BaseModel, nn.Module):
         train_accuracies, val_accuracies = [], []
 
         for epoch in range(self.config.epochs):
+            self.train()
             train_loss, train_correct = 0.0, 0
             for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch + 1}"):
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
                 self.optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 self.optimizer.step()
-
                 train_loss += loss.item() * labels.size(0)
                 train_correct += (outputs.argmax(1) == labels).sum().item()
 
-            train_loss /= len(train_loader.dataset)
-            train_acc = train_correct / len(train_loader.dataset)
-
-            val_loss, val_correct = 0.0, 0
             self.eval()
+            val_loss, val_correct = 0.0, 0
             with torch.no_grad():
                 for inputs, labels in val_loader:
                     inputs, labels = inputs.to(self.device), labels.to(self.device)
                     outputs = self(inputs)
-
                     val_loss += self.criterion(outputs, labels).item() * labels.size(0)
                     val_correct += (outputs.argmax(1) == labels).sum().item()
 
+            train_loss /= len(train_loader.dataset)
+            train_acc = train_correct / len(train_loader.dataset)
             val_loss /= len(val_loader.dataset)
             val_acc = val_correct / len(val_loader.dataset)
 
             print(f"Train Loss: {train_loss:.4f} | Acc: {train_acc:.4f}")
             print(f" Val Loss: {val_loss:.4f} | Acc: {val_acc:.4f}\n")
-
             train_losses.append(train_loss)
             val_losses.append(val_loss)
             train_accuracies.append(train_acc)
@@ -130,10 +143,8 @@ class SERLSTM(BaseModel, nn.Module):
                 best_acc = val_acc
                 self.save()
         # 训练完成后绘制曲线
-
         plot.curve(train_losses, val_losses, "Loss Curve", "Loss")
         plot.curve(train_accuracies, val_accuracies, "Accuracy Curve", "Accuracy")
-
 
     def save(self):
         files.mkdirs(self.config.checkpoint_path)
@@ -231,7 +242,9 @@ class SERLSTM(BaseModel, nn.Module):
 
 if __name__ == '__main__':
     testwav = r"C:\Users\35055\Desktop\example.wav"
-    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\demo.ini"
+    # ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\configuration\demo.ini"
+    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\configuration\RNN.ini"
+    # ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\configuration\new.ini"
     config = config.get_config(ini_path)
     lstm = SERLSTM(config)
     lstm.train_model()

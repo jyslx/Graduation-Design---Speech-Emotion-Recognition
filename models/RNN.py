@@ -23,6 +23,8 @@ class SERRNN(BaseModel, nn.Module):
         BaseModel.__init__(self, model=None, config=config)
         nn.Module.__init__(self)
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         # RNN 层定义
         self.rnn = nn.RNN(
             input_size=self.config.input_size,  # 输入特征维度（如MFCC特征数）
@@ -35,11 +37,14 @@ class SERRNN(BaseModel, nn.Module):
 
         # 全连接分类层（双向需隐藏层维度*2）
         self.fc = nn.Linear(self.config.hidden_size * 2, self.config.num_classes)
-
-        # 优化器 & 损失函数
+        self.criterion = nn.CrossEntropyLoss().to(self.device)
+        self.to(self.device)
         self.optimizer = optim.Adam(self.parameters(), lr=config.lr)
-        self.criterion = nn.CrossEntropyLoss()
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        for param in self.optimizer.state.values():
+            if isinstance(param, torch.Tensor):
+                param.data = param.data.to(self.device)
+                if param.grad is not None:
+                    param.grad.data = param.grad.data.to(self.device)
 
         # 数据预处理相关
         self.label_encoder = None
@@ -75,9 +80,13 @@ class SERRNN(BaseModel, nn.Module):
             self.label_encoder = processor.label_encoder
             self.scaler = processor.scaler
 
-            train_loader = DataLoader(SERDataset(X_train, y_train), batch_size=self.config.batch_size, shuffle=True)
-            val_loader = DataLoader(SERDataset(X_val, y_val), batch_size=self.config.batch_size)
-            test_loader = DataLoader(SERDataset(X_test, y_test), batch_size=self.config.batch_size)
+            train_dataset = SERDataset(X_train, y_train, device=self.device)
+            val_dataset = SERDataset(X_val, y_val, device=self.device)
+            test_dataset = SERDataset(X_test, y_test, device=self.device)
+
+            train_loader = DataLoader(train_dataset, batch_size=self.config.batch_size, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=self.config.batch_size)
+            test_loader = DataLoader(test_dataset, batch_size=self.config.batch_size)
 
         # 训练循环（直接复用SERLSTM的代码）
         best_acc = 0.0
@@ -89,14 +98,11 @@ class SERRNN(BaseModel, nn.Module):
             self.train()
             train_loss, train_correct = 0.0, 0
             for inputs, labels in tqdm(train_loader, desc=f"Epoch {epoch + 1}"):
-                inputs, labels = inputs.to(self.device), labels.to(self.device)
-
                 self.optimizer.zero_grad()
                 outputs = self(inputs)
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 self.optimizer.step()
-
                 train_loss += loss.item() * labels.size(0)
                 train_correct += (outputs.argmax(1) == labels).sum().item()
 
@@ -234,7 +240,7 @@ class SERRNN(BaseModel, nn.Module):
 
 if __name__ == '__main__':
     testwav = r"C:\Users\35055\Desktop\example.wav"
-    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\RNN.ini"
+    ini_path = r"C:\Users\35055\Desktop\Graduation-Design---Speech-Emotion-Recognition\configuration\RNN.ini"
     config = config.get_config(ini_path)
     RNN = SERRNN(config)
     RNN.train_model()
